@@ -311,6 +311,7 @@
       <div class="toolbar">
         <button class="btn primary" id="btn-novo">+ Novo cliente</button>
         <button class="btn" id="btn-importar" style="display:none;">Importar planilha</button>
+        <button class="btn" id="btn-excluir-tudo" style="display:none;color:var(--vermelho);">Excluir todos os clientes</button>
         <input class="search" id="busca" placeholder="Buscar cliente...">
       </div>
       <div class="table-wrap">
@@ -610,11 +611,14 @@
   function resolverUidPorNome(nome) {
     var alvo = normalizarTexto(nome);
     if (!alvo) return null;
-    var achou = null;
+    var exato = null, parcial = null;
     Object.keys(usuariosMap).forEach(function (uid) {
-      if (normalizarTexto(usuariosMap[uid].nome) === alvo) achou = uid;
+      var nomeUsuario = normalizarTexto(usuariosMap[uid].nome);
+      if (!nomeUsuario) return;
+      if (nomeUsuario === alvo) exato = uid;
+      else if (!parcial && (nomeUsuario.indexOf(alvo) > -1 || alvo.indexOf(nomeUsuario) > -1)) parcial = uid;
     });
-    return achou;
+    return exato || parcial;
   }
 
   // ---------- geração de ações (mesma lógica de negócio do painel anterior) ----------
@@ -1425,6 +1429,43 @@
     if (e.target === this) this.classList.remove('open');
   });
 
+  document.getElementById('btn-excluir-tudo').addEventListener('click', function () {
+    var confirmacao = prompt('Isso apaga TODOS os clientes cadastrados no RSF (de todo mundo), sem volta. Digite EXCLUIR (em maiúsculas) para confirmar:');
+    if (confirmacao === null) return;
+    if (confirmacao !== 'EXCLUIR') { alert('Cancelado — o texto digitado não confere.'); return; }
+    var botao = this;
+    botao.disabled = true;
+    botao.textContent = 'Excluindo...';
+    db.collection('clientes').get().then(function (snap) {
+      var docs = snap.docs;
+      if (!docs.length) {
+        alert('Não há clientes cadastrados.');
+        botao.disabled = false; botao.textContent = 'Excluir todos os clientes';
+        return;
+      }
+      var CHUNK = 400, idx = 0;
+      function proximoLote() {
+        if (idx >= docs.length) {
+          alert(docs.length + ' cliente(s) excluído(s).');
+          botao.disabled = false; botao.textContent = 'Excluir todos os clientes';
+          return;
+        }
+        var lote = docs.slice(idx, idx + CHUNK);
+        var batch = db.batch();
+        lote.forEach(function (d) { batch.delete(d.ref); });
+        batch.commit().then(function () { idx += CHUNK; proximoLote(); })
+          .catch(function (err) {
+            alert('Erro ao excluir: ' + (err && err.message || 'tente novamente.'));
+            botao.disabled = false; botao.textContent = 'Excluir todos os clientes';
+          });
+      }
+      proximoLote();
+    }).catch(function (err) {
+      alert('Erro ao buscar clientes: ' + (err && err.message || 'tente novamente.'));
+      botao.disabled = false; botao.textContent = 'Excluir todos os clientes';
+    });
+  });
+
   document.getElementById('btn-baixar-modelo').addEventListener('click', function () {
     var conteudo = 'Cliente,Modelo,Credito,Plano,Telefone,CPF,Vendedor,Equipe,Tipo,DataVenda,ProximaAssembleia,Pagamento,PosVendas,Parcela2Vencimento,Parcela2Status,Parcela3Vencimento,Parcela3Status\n' +
       'Thiago Lameu da Silva,Moto,"R$ 52.414,29",Normal,(18) 99626-7134,387.165.758-14,Pedro,Camaleões,Moto,09/09/2026,10/10/2026,Concluído,Concluído,10/10/2026,Pendente,10/11/2026,Pendente\n';
@@ -1671,7 +1712,8 @@
   function subscribeClientes() {
     if (unsubClientes) { unsubClientes(); unsubClientes = null; }
     var col = db.collection('clientes');
-    var query = (currentUser.role === 'admin' && viewMode === 'team') ? col : col.where('vendedorUid', '==', currentUser.uid);
+    // Visão de equipe escondida por enquanto: admin vê tudo que existe (evita registros "sem vínculo" sumirem de vista); vendedor comum vê só o próprio.
+    var query = (currentUser.role === 'admin') ? col : col.where('vendedorUid', '==', currentUser.uid);
     unsubClientes = query.onSnapshot(function (snap) {
       clientes = snap.docs.map(function (d) { var data = d.data() || {}; data.id = d.id; return data; });
       renderAll();
@@ -1694,8 +1736,9 @@
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app-screen').style.display = 'block';
       document.getElementById('who-name').textContent = currentUser.nome + (currentUser.role === 'admin' ? ' · admin' : '');
-      document.getElementById('view-switch').style.display = currentUser.role === 'admin' ? 'flex' : 'none';
+      document.getElementById('view-switch').style.display = 'none'; // visão de equipe escondida por enquanto
       document.getElementById('btn-importar').style.display = currentUser.role === 'admin' ? 'inline-block' : 'none';
+      document.getElementById('btn-excluir-tudo').style.display = currentUser.role === 'admin' ? 'inline-block' : 'none';
       viewMode = 'mine';
       filtroVendedorUid = '';
       document.querySelectorAll('.view-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.view === 'mine'); });
