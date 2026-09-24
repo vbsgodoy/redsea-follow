@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>RSF — Red Sea Follow</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23E2661C'/%3E%3Cpath d='M6 16c3-4 7-4 10 0s7 4 10 0s7-4 10 0' stroke='%23fff' stroke-width='3.5' fill='none' stroke-linecap='round'/%3E%3Cpath d='M6 24c3-4 7-4 10 0s7 4 10 0s7-4 10 0' stroke='%23fff' stroke-width='3.5' fill='none' stroke-linecap='round' opacity='0.6'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -15,40 +16,40 @@
 
 <style>
   :root {
-    --bg: #EEEEDF;
+    --bg: #FAFAF7;
     --surface: #FFFFFF;
-    --surface-2: #F6F5E9;
-    --ink: #23261C;
-    --ink-soft: #5B5C4C;
-    --border: #DAD7C1;
-    --brand: #2F5D50;
-    --brand-dark: #1F4038;
-    --brand-tint: #E0EAE5;
+    --surface-2: #F3F2EC;
+    --ink: #201F1C;
+    --ink-soft: #6B6A62;
+    --border: #E7E4DA;
+    --brand: #E2661C;
+    --brand-dark: #B94F13;
+    --brand-tint: #FCE9DC;
     --verde: #4C7A3D;
     --verde-bg: #E1EBD9;
     --amarelo: #A9791E;
     --amarelo-bg: #F3E7C9;
-    --laranja: #B75B22;
-    --laranja-bg: #F5DEC7;
+    --laranja: #C1642E;
+    --laranja-bg: #F6DFCC;
     --vermelho: #A63A28;
     --vermelho-bg: #F2D8CF;
     --font-display: "Fraunces", Georgia, "Times New Roman", serif;
     --font-body: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --shadow: 0 1px 2px rgba(35,38,28,0.06), 0 4px 14px rgba(35,38,28,0.06);
+    --shadow: 0 1px 2px rgba(32,31,28,0.06), 0 4px 14px rgba(32,31,28,0.06);
     --radius: 10px;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #191B14; --surface: #22251C; --surface-2: #262A1F; --ink: #EAE8D8; --ink-soft: #A9A88F;
-      --border: #3A3D2E; --brand: #6FA391; --brand-dark: #8FC2AF; --brand-tint: #24352E;
+      --bg: #17140F; --surface: #211D17; --surface-2: #28231B; --ink: #F5F1E8; --ink-soft: #B0A99A;
+      --border: #3A3327; --brand: #FF8A42; --brand-dark: #FFA766; --brand-tint: #3A2414;
       --verde: #8FBF77; --verde-bg: #263420; --amarelo: #E0B75B; --amarelo-bg: #3A2F17;
       --laranja: #E58F55; --laranja-bg: #3D2A16; --vermelho: #E28166; --vermelho-bg: #3D2118;
       --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 14px rgba(0,0,0,0.3);
     }
   }
   :root[data-theme="dark"] {
-    --bg: #191B14; --surface: #22251C; --surface-2: #262A1F; --ink: #EAE8D8; --ink-soft: #A9A88F;
-    --border: #3A3D2E; --brand: #6FA391; --brand-dark: #8FC2AF; --brand-tint: #24352E;
+    --bg: #17140F; --surface: #211D17; --surface-2: #28231B; --ink: #F5F1E8; --ink-soft: #B0A99A;
+    --border: #3A3327; --brand: #FF8A42; --brand-dark: #FFA766; --brand-tint: #3A2414;
     --verde: #8FBF77; --verde-bg: #263420; --amarelo: #E0B75B; --amarelo-bg: #3A2F17;
     --laranja: #E58F55; --laranja-bg: #3D2A16; --vermelho: #E28166; --vermelho-bg: #3D2118;
     --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 14px rgba(0,0,0,0.3);
@@ -70,9 +71,9 @@
     background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
     box-shadow: var(--shadow); padding: 30px 28px; width: 100%; max-width: 380px;
   }
-  .login-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-  .login-brand .mark { font-size: 26px; }
-  .login-brand .name { font-family: var(--font-display); font-weight: 700; font-size: 24px; }
+  .login-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .logo-icon { flex-shrink: 0; display: block; }
+  .login-brand .name { font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: -0.01em; }
   .login-sub { font-size: 13px; color: var(--ink-soft); margin-bottom: 22px; }
   .login-tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
   .login-tab {
@@ -99,7 +100,6 @@
   }
   .topbar-inner { max-width: 980px; margin: 0 auto; }
   .brand-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .brand-mark { font-size: 22px; line-height: 1; }
   .brand-name { font-family: var(--font-display); font-weight: 600; font-size: 22px; letter-spacing: -0.01em; }
   .brand-tag { font-size: 13px; color: var(--ink-soft); }
   .who { margin-left: auto; display: flex; align-items: center; gap: 10px; }
@@ -177,7 +177,7 @@
   input.search { flex: 1; min-width: 160px; }
 
   .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
-  table { border-collapse: collapse; width: 100%; min-width: 820px; }
+  table { border-collapse: collapse; width: 100%; min-width: 1180px; }
   th, td { text-align: left; padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.02em; color: var(--ink-soft); background: var(--surface-2); }
   tbody tr:last-child td { border-bottom: none; }
@@ -214,7 +214,15 @@
 <!-- ============== TELA DE LOGIN ============== -->
 <div id="login-screen">
   <div class="login-card">
-    <div class="login-brand"><span class="mark">🦎</span><span class="name">RSF</span></div>
+    <div class="login-brand">
+      <svg class="logo-icon" width="34" height="34" viewBox="0 0 40 40" aria-hidden="true">
+        <rect width="40" height="40" rx="10" fill="#E2661C"/>
+        <path d="M6 16c3-4 7-4 10 0s7 4 10 0s7-4 10 0" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <path d="M6 23c3-4 7-4 10 0s7 4 10 0s7-4 10 0" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.65"/>
+        <path d="M6 30c3-4 7-4 10 0s7 4 10 0s7-4 10 0" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.35"/>
+      </svg>
+      <span class="name">RSF</span>
+    </div>
     <div class="login-sub">Red Sea Follow — acompanhamento de pós-venda e adimplência</div>
 
     <div class="login-tabs">
@@ -250,7 +258,11 @@
   <div class="topbar">
     <div class="topbar-inner">
       <div class="brand-row">
-        <span class="brand-mark">🦎</span>
+        <svg class="logo-icon" width="26" height="26" viewBox="0 0 40 40" aria-hidden="true">
+          <rect width="40" height="40" rx="10" fill="#E2661C"/>
+          <path d="M6 16c3-4 7-4 10 0s7 4 10 0s7-4 10 0" stroke="#FFFFFF" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+          <path d="M6 24c3-4 7-4 10 0s7 4 10 0s7-4 10 0" stroke="#FFFFFF" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+        </svg>
         <span class="brand-name">RSF</span>
         <span class="brand-tag">Red Sea Follow</span>
         <div class="who">
@@ -292,6 +304,10 @@
           <thead>
             <tr>
               <th>Cliente</th>
+              <th>Modelo</th>
+              <th>Valor</th>
+              <th>Telefone</th>
+              <th>CPF</th>
               <th>Vendedor</th>
               <th>Data da venda</th>
               <th>Pós-venda</th>
@@ -338,6 +354,10 @@
         <div class="form-field">
           <label>Telefone (WhatsApp)</label>
           <input class="field" name="telefone" placeholder="(11) 99999-9999">
+        </div>
+        <div class="form-field">
+          <label>CPF</label>
+          <input class="field" name="cpf" placeholder="000.000.000-00">
         </div>
         <div class="form-field">
           <label>Data da venda</label>
@@ -603,7 +623,7 @@
     countBadge.textContent = urgentes;
     countBadge.className = 'count' + (urgentes === 0 ? ' zero' : '');
 
-    if (!acoes.length) { el.innerHTML = '<div class="empty">Nenhuma ação pendente hoje. Tudo em dia! 🦎</div>'; return; }
+    if (!acoes.length) { el.innerHTML = '<div class="empty">Nenhuma ação pendente hoje. Tudo em dia!</div>'; return; }
 
     el.innerHTML = acoes.map(function (a, idx) {
       var wa = linkWhatsapp(a.cliente.telefone, a.mensagem);
@@ -666,6 +686,10 @@
       return '' +
         '<tr>' +
         '<td class="nome">' + escapeHtml(c.nome) + '</td>' +
+        '<td>' + escapeHtml(c.modelo || '—') + '</td>' +
+        '<td>' + escapeHtml(c.credito || '—') + '</td>' +
+        '<td>' + escapeHtml(c.telefone || '—') + '</td>' +
+        '<td>' + escapeHtml(c.cpf || '—') + '</td>' +
         '<td>' + escapeHtml(c.vendedorNome || '—') + '</td>' +
         '<td>' + (dv ? formatData(dv) : '—') + '</td>' +
         '<td>' + statusPosVendaBadge(c) + '</td>' +
@@ -704,6 +728,7 @@
     form.credito.value = c.credito || '';
     form.plano.value = c.plano || 'ON';
     form.telefone.value = c.telefone || '';
+    form.cpf.value = c.cpf || '';
     form.dataVenda.value = c.dataVenda || '';
     form.posVendasStatus.value = c.posVendasStatus || 'pendente';
     if (form.vendedorNomeManual) form.vendedorNomeManual.value = c.vendedorNome || '';
@@ -732,6 +757,7 @@
       credito: (fd.get('credito') || '').trim(),
       plano: fd.get('plano'),
       telefone: (fd.get('telefone') || '').trim(),
+      cpf: (fd.get('cpf') || '').trim(),
       dataVenda: fd.get('dataVenda'),
       posVendasStatus: fd.get('posVendasStatus'),
       parcela2: { vencimento: fd.get('parcela2Vencimento') || null, status: fd.get('parcela2Status') },
