@@ -110,7 +110,8 @@
   .who-name { font-size: 13px; font-weight: 600; }
   .who button { font-family: var(--font-body); font-size: 12.5px; font-weight: 600; padding: 6px 11px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft); cursor: pointer; }
 
-  .view-switch { display: flex; gap: 4px; margin-top: 12px; }
+  .view-switch { display: flex; gap: 4px; margin-top: 12px; align-items: center; }
+  .view-switch select { margin-left: 4px; }
   .view-btn {
     font-family: var(--font-body); font-size: 12.5px; font-weight: 600; padding: 6px 12px;
     border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft); cursor: pointer;
@@ -147,6 +148,8 @@
   .bonus-flag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; margin-top: 8px; }
   .bonus-flag.on { background: var(--verde-bg); color: var(--verde); }
   .bonus-flag.off { background: var(--surface-2); color: var(--ink-soft); }
+  .meta-edit { display: flex; gap: 8px; margin-top: 12px; }
+  .meta-edit input { flex: 1; }
 
   .empty { border: 1px dashed var(--border); border-radius: var(--radius); padding: 26px 18px; text-align: center; color: var(--ink-soft); font-size: 14px; }
 
@@ -279,10 +282,14 @@
       <div class="view-switch" id="view-switch" style="display:none;">
         <button class="view-btn active" data-view="mine">Minha carteira</button>
         <button class="view-btn" data-view="team">Toda a equipe</button>
+        <span id="vendedor-filter-wrap" style="display:none;">
+          <select id="vendedor-filter" class="field"><option value="">Todos os vendedores</option></select>
+        </span>
       </div>
       <div class="tabs">
         <button class="tab active" data-tab="hoje">Hoje <span class="count zero" id="count-hoje">0</span></button>
         <button class="tab" data-tab="clientes">Clientes</button>
+        <button class="tab" data-tab="projecao">Projeção</button>
       </div>
     </div>
   </div>
@@ -303,6 +310,7 @@
       <div class="note">Prazo do pós-venda calculado automaticamente: dia 15 do mês seguinte ao da venda. Vencimento das parcelas é informado manualmente em cada cliente.</div>
       <div class="toolbar">
         <button class="btn primary" id="btn-novo">+ Novo cliente</button>
+        <button class="btn" id="btn-importar" style="display:none;">Importar planilha</button>
         <input class="search" id="busca" placeholder="Buscar cliente...">
       </div>
       <div class="table-wrap">
@@ -326,6 +334,16 @@
         </table>
       </div>
       <div class="empty" id="tabela-vazia" style="display:none;margin-top:12px;">Nenhum cliente cadastrado ainda. Clique em "Novo cliente" para começar.</div>
+    </section>
+
+    <section class="tab-panel" id="tab-projecao">
+      <h2>Projeção do mês</h2>
+      <div class="cards-grid" id="projecao-cards"></div>
+      <div id="meta-mensal-wrap"></div>
+      <div id="ranking-wrap">
+        <h2>Por vendedor</h2>
+        <div id="ranking-vendedores"></div>
+      </div>
     </section>
   </main>
 
@@ -413,6 +431,30 @@
   </div>
 </div>
 
+<!-- ============== MODAL DE IMPORTAÇÃO ============== -->
+<div class="modal-backdrop" id="modal-import-backdrop">
+  <div class="modal">
+    <h3>Importar planilha</h3>
+    <div class="note">
+      Arquivo CSV com as colunas: <strong>Cliente, Modelo, Credito, Plano, Telefone, CPF, Vendedor, DataVenda, PosVendas, Parcela2Vencimento, Parcela2Status, Parcela3Vencimento, Parcela3Status</strong>.
+      Datas no formato DD/MM/AAAA. PosVendas e os status das parcelas aceitam "Concluído"/"Pendente"/"Pago" em qualquer maiúscula/minúscula.
+      O nome em "Vendedor" precisa ser igual ao nome que a pessoa usou ao criar a conta no RSF pra vincular certinho — senão o cliente entra sem vínculo e você associa depois editando.
+    </div>
+    <div class="toolbar">
+      <button type="button" class="btn" id="btn-baixar-modelo">Baixar modelo (.csv)</button>
+      <input type="file" id="import-file" accept=".csv">
+    </div>
+    <div id="import-preview"></div>
+    <div class="modal-actions">
+      <div></div>
+      <div class="right">
+        <button type="button" class="btn" id="btn-import-cancelar">Cancelar</button>
+        <button type="button" class="btn primary" id="btn-import-confirmar" disabled>Confirmar importação</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
@@ -446,6 +488,10 @@
   var unsubClientes = null;
   var editingId = null;
   var viewMode = 'mine';      // 'mine' | 'team' (admin apenas)
+  var filtroVendedorUid = ''; // usado só quando admin + viewMode 'team'
+  var usuariosMap = {};       // uid -> { nome, email, role } (carregado só para admin)
+  var metaMensalValor = 0;
+  var linhasParaImportar = [];
 
   // ---------- tema claro/escuro ----------
 
@@ -505,6 +551,25 @@
     if (!digits) return null;
     if (digits.length <= 11) digits = '55' + digits;
     return 'https://wa.me/' + digits + '?text=' + encodeURIComponent(mensagem);
+  }
+  function normalizarTexto(s) {
+    return (s || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  function parseDataBR(s) {
+    if (!s) return null;
+    var m = String(s).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) return null;
+    var dd = ('0' + m[1]).slice(-2), mm = ('0' + m[2]).slice(-2);
+    return m[3] + '-' + mm + '-' + dd;
+  }
+  function resolverUidPorNome(nome) {
+    var alvo = normalizarTexto(nome);
+    if (!alvo) return null;
+    var achou = null;
+    Object.keys(usuariosMap).forEach(function (uid) {
+      if (normalizarTexto(usuariosMap[uid].nome) === alvo) achou = uid;
+    });
+    return achou;
   }
 
   // ---------- geração de ações (mesma lógica de negócio do painel anterior) ----------
@@ -568,9 +633,9 @@
 
   var ORDEM_URGENCIA = { atrasado: 0, hoje: 1, urgente: 2, atencao: 3, leve: 4 };
 
-  function gerarTodasAcoes() {
+  function gerarTodasAcoes(lista) {
     var acoes = [];
-    clientes.forEach(function (c) {
+    lista.forEach(function (c) {
       var a1 = gerarAcaoPosVenda(c); if (a1) acoes.push(a1);
       var a2 = gerarAcaoParcela(c, 2); if (a2) acoes.push(a2);
       var a3 = gerarAcaoParcela(c, 3); if (a3) acoes.push(a3);
@@ -582,11 +647,36 @@
     return acoes;
   }
 
-  function calcDashboard() {
+  function clientesFiltrados() {
+    if (currentUser.role === 'admin' && viewMode === 'team' && filtroVendedorUid) {
+      return clientes.filter(function (c) { return c.vendedorUid === filtroVendedorUid; });
+    }
+    return clientes;
+  }
+
+  function calcProjecao(lista) {
     var hoje = todayDate();
-    var total = clientes.length;
-    var posConcluido = clientes.filter(function (c) { return c.posVendasStatus === 'concluido'; }).length;
-    var pendentes = clientes.filter(function (c) { return c.posVendasStatus !== 'concluido'; });
+    var ano = hoje.getFullYear(), mes = hoje.getMonth();
+    var vendasMes = lista.filter(function (c) {
+      var d = parseISODate(c.dataVenda);
+      return d && d.getFullYear() === ano && d.getMonth() === mes;
+    });
+    var totalCredito = 0;
+    vendasMes.forEach(function (c) { totalCredito += parseMoeda(c.credito); });
+    var qtd = vendasMes.length;
+    var ticketMedio = qtd ? totalCredito / qtd : 0;
+    var diaAtual = hoje.getDate();
+    var diasNoMes = new Date(ano, mes + 1, 0).getDate();
+    var mediaDiaria = diaAtual ? totalCredito / diaAtual : 0;
+    var projecao = mediaDiaria * diasNoMes;
+    return { totalCredito: totalCredito, qtd: qtd, ticketMedio: ticketMedio, diaAtual: diaAtual, diasNoMes: diasNoMes, projecao: projecao, vendasMes: vendasMes };
+  }
+
+  function calcDashboard(lista) {
+    var hoje = todayDate();
+    var total = lista.length;
+    var posConcluido = lista.filter(function (c) { return c.posVendasStatus === 'concluido'; }).length;
+    var pendentes = lista.filter(function (c) { return c.posVendasStatus !== 'concluido'; });
     var posAtrasado = 0;
     pendentes.forEach(function (c) {
       var prazo = calcPrazoPosVenda(c.dataVenda);
@@ -595,7 +685,7 @@
     function statsParcela(n) {
       var key = n === 2 ? 'parcela2' : 'parcela3';
       var elegiveis = 0, pagas = 0, valorPago = 0;
-      clientes.forEach(function (c) {
+      lista.forEach(function (c) {
         var p = c[key];
         if (p && p.vencimento) {
           var venc = parseISODate(p.vencimento);
@@ -613,8 +703,8 @@
 
   // ---------- renderização ----------
 
-  function renderDashboard() {
-    var d = calcDashboard();
+  function renderDashboard(lista) {
+    var d = calcDashboard(lista);
     document.getElementById('dashboard-cards').innerHTML =
       cardHtml('Clientes', d.total, '') +
       cardHtml('Pós-venda concluído', d.posConcluido, d.total ? Math.round(d.posConcluido / d.total * 100) + '% da carteira' : '') +
@@ -645,8 +735,8 @@
     document.getElementById('meta-cards').innerHTML = metaCardHtml('2ª parcela', d.parcela2) + metaCardHtml('3ª parcela', d.parcela3);
   }
 
-  function renderAcoes() {
-    var acoes = gerarTodasAcoes();
+  function renderAcoes(lista) {
+    var acoes = gerarTodasAcoes(lista);
     var el = document.getElementById('acoes-list');
     var countBadge = document.getElementById('count-hoje');
     var urgentes = acoes.filter(function (a) { return a.urgencia !== 'leve'; }).length;
@@ -700,9 +790,9 @@
     return '<span class="badge neutro">vence em ' + dias + 'd</span>';
   }
 
-  function renderTabela() {
+  function renderTabela(listaBase) {
     var termo = (document.getElementById('busca').value || '').toLowerCase();
-    var lista = clientes.filter(function (c) {
+    var lista = listaBase.filter(function (c) {
       if (!termo) return true;
       return (c.nome || '').toLowerCase().indexOf(termo) > -1 || (c.vendedorNome || '').toLowerCase().indexOf(termo) > -1;
     }).slice().sort(function (a, b) { return (b.dataVenda || '').localeCompare(a.dataVenda || ''); });
@@ -713,6 +803,7 @@
     vazio.style.display = 'none';
     body.innerHTML = lista.map(function (c) {
       var dv = parseISODate(c.dataVenda);
+      var vendedorCel = escapeHtml(c.vendedorNome || '—') + (c.vendedorUid ? '' : ' <span class="badge neutro">não vinculado</span>');
       return '' +
         '<tr>' +
         '<td class="nome">' + escapeHtml(c.nome) + '</td>' +
@@ -720,7 +811,7 @@
         '<td>' + escapeHtml(c.credito || '—') + '</td>' +
         '<td>' + escapeHtml(c.telefone || '—') + '</td>' +
         '<td>' + escapeHtml(c.cpf || '—') + '</td>' +
-        '<td>' + escapeHtml(c.vendedorNome || '—') + '</td>' +
+        '<td>' + vendedorCel + '</td>' +
         '<td>' + (dv ? formatData(dv) : '—') + '</td>' +
         '<td>' + statusPosVendaBadge(c) + '</td>' +
         '<td>' + statusParcelaBadge(c, 2) + '</td>' +
@@ -730,7 +821,76 @@
     }).join('');
   }
 
-  function renderAll() { renderDashboard(); renderAcoes(); renderTabela(); }
+  function renderVendedorFilterOptions() {
+    var sel = document.getElementById('vendedor-filter');
+    if (!sel) return;
+    var atual = sel.value;
+    var opts = Object.keys(usuariosMap)
+      .filter(function (uid) { return usuariosMap[uid].role !== 'admin'; })
+      .map(function (uid) { return { uid: uid, nome: usuariosMap[uid].nome || usuariosMap[uid].email || uid }; })
+      .sort(function (a, b) { return a.nome.localeCompare(b.nome); });
+    sel.innerHTML = '<option value="">Todos os vendedores</option>' +
+      opts.map(function (o) { return '<option value="' + o.uid + '">' + escapeHtml(o.nome) + '</option>'; }).join('');
+    if (opts.some(function (o) { return o.uid === atual; })) sel.value = atual;
+  }
+
+  function renderProjecao(lista) {
+    var p = calcProjecao(lista);
+    var mesNome = todayDate().toLocaleDateString('pt-BR', { month: 'long' });
+    document.getElementById('projecao-cards').innerHTML =
+      cardHtml('Vendido em ' + mesNome, formatMoeda(p.totalCredito), p.qtd + ' venda(s) no mês') +
+      cardHtml('Ticket médio', formatMoeda(p.ticketMedio), '') +
+      cardHtml('Projeção de fechamento', formatMoeda(p.projecao), 'com base no dia ' + p.diaAtual + ' de ' + p.diasNoMes);
+
+    var metaWrap = document.getElementById('meta-mensal-wrap');
+    var rankingWrap = document.getElementById('ranking-wrap');
+    var mostrarEquipe = currentUser.role === 'admin' && viewMode === 'team';
+
+    if (!mostrarEquipe) {
+      metaWrap.innerHTML = '';
+      rankingWrap.style.display = 'none';
+      return;
+    }
+    rankingWrap.style.display = 'block';
+
+    var pctMeta = metaMensalValor ? Math.min(100, p.totalCredito / metaMensalValor * 100) : 0;
+    metaWrap.innerHTML =
+      '<div class="meta-card">' +
+      '  <div class="meta-head"><div class="meta-title">Meta do mês</div><div class="meta-pct">' + (metaMensalValor ? Math.round(pctMeta) + '%' : '—') + '</div></div>' +
+      '  <div class="bar-track"><div class="bar-fill" style="width:' + pctMeta + '%"></div></div>' +
+      '  <div class="meta-row"><span>' + formatMoeda(p.totalCredito) + ' vendidos</span><span>meta: ' + (metaMensalValor ? formatMoeda(metaMensalValor) : 'não definida') + '</span></div>' +
+      '  <div class="meta-edit"><input type="text" id="input-meta-mensal" class="field" placeholder="Definir meta em R$" value="' + (metaMensalValor || '') + '"><button type="button" class="btn" id="btn-salvar-meta">Salvar meta</button></div>' +
+      '</div>';
+    document.getElementById('btn-salvar-meta').addEventListener('click', function () {
+      var val = parseMoeda(document.getElementById('input-meta-mensal').value);
+      db.collection('config').doc('metaMensal').set({ valor: val })
+        .catch(function () { alert('Não foi possível salvar a meta.'); });
+    });
+
+    var porVendedor = {};
+    p.vendasMes.forEach(function (c) {
+      var chave = c.vendedorNome || 'Sem nome';
+      porVendedor[chave] = (porVendedor[chave] || 0) + parseMoeda(c.credito);
+    });
+    var ranking = Object.keys(porVendedor).map(function (nome) { return { nome: nome, total: porVendedor[nome] }; })
+      .sort(function (a, b) { return b.total - a.total; });
+    var maior = ranking.length ? ranking[0].total : 0;
+    document.getElementById('ranking-vendedores').innerHTML = ranking.length ? ranking.map(function (r) {
+      var largura = maior ? (r.total / maior * 100) : 0;
+      return '<div class="meta-card" style="padding:12px 16px;">' +
+        '<div class="meta-row" style="margin-bottom:6px;"><span style="font-weight:600;color:var(--ink);">' + escapeHtml(r.nome) + '</span><span>' + formatMoeda(r.total) + '</span></div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + largura + '%"></div></div>' +
+        '</div>';
+    }).join('') : '<div class="empty">Nenhuma venda lançada este mês ainda.</div>';
+  }
+
+  function renderAll() {
+    var lista = clientesFiltrados();
+    renderDashboard(lista);
+    renderAcoes(lista);
+    renderTabela(lista);
+    renderProjecao(lista);
+  }
 
   // ---------- modal / formulário de cliente ----------
 
@@ -796,8 +956,15 @@
 
     if (editingId) {
       var atual = clientes.find(function (x) { return x.id === editingId; }) || {};
-      dados.vendedorUid = atual.vendedorUid || currentUser.uid;
-      dados.vendedorNome = isAdmin && fd.get('vendedorNomeManual') ? fd.get('vendedorNomeManual').trim() : (atual.vendedorNome || currentUser.nome);
+      var nomeFormAdmin = isAdmin && fd.get('vendedorNomeManual') ? fd.get('vendedorNomeManual').trim() : '';
+      var novoNome = nomeFormAdmin || atual.vendedorNome || currentUser.nome;
+      var novoUid = atual.vendedorUid || null;
+      if (isAdmin && nomeFormAdmin && nomeFormAdmin !== atual.vendedorNome) {
+        var uidResolvido = resolverUidPorNome(nomeFormAdmin);
+        if (uidResolvido) novoUid = uidResolvido;
+      }
+      dados.vendedorUid = novoUid || currentUser.uid;
+      dados.vendedorNome = novoNome;
       db.collection('clientes').doc(editingId).set(dados)
         .then(fecharModal)
         .catch(function (err) { alert('Não foi possível salvar. (' + (err && err.code || 'erro') + ')'); });
@@ -818,7 +985,136 @@
       .catch(function () { alert('Não foi possível excluir.'); });
   });
 
-  document.getElementById('busca').addEventListener('input', renderTabela);
+  // ---------- importação de planilha (CSV) ----------
+
+  function parseCSV(texto) {
+    var linhas = texto.replace(/\r/g, '').split('\n').filter(function (l) { return l.trim().length; });
+    if (!linhas.length) return [];
+    var header = linhas[0];
+    var delim = (header.split(';').length > header.split(',').length) ? ';' : ',';
+    function parseLinha(linha) {
+      var campos = [], atual = '', dentroAspas = false;
+      for (var i = 0; i < linha.length; i++) {
+        var ch = linha[i];
+        if (ch === '"') {
+          if (dentroAspas && linha[i + 1] === '"') { atual += '"'; i++; }
+          else dentroAspas = !dentroAspas;
+        } else if (ch === delim && !dentroAspas) {
+          campos.push(atual); atual = '';
+        } else {
+          atual += ch;
+        }
+      }
+      campos.push(atual);
+      return campos.map(function (c) { return c.trim(); });
+    }
+    var cabecalho = parseLinha(linhas[0]);
+    var linhasObj = [];
+    for (var i = 1; i < linhas.length; i++) {
+      var campos = parseLinha(linhas[i]);
+      var obj = {};
+      cabecalho.forEach(function (h, idx) { obj[h] = campos[idx] !== undefined ? campos[idx] : ''; });
+      linhasObj.push(obj);
+    }
+    return linhasObj;
+  }
+
+  document.getElementById('btn-importar').addEventListener('click', function () {
+    document.getElementById('import-file').value = '';
+    document.getElementById('import-preview').innerHTML = '';
+    document.getElementById('btn-import-confirmar').disabled = true;
+    document.getElementById('btn-import-confirmar').textContent = 'Confirmar importação';
+    linhasParaImportar = [];
+    document.getElementById('modal-import-backdrop').classList.add('open');
+  });
+  document.getElementById('btn-import-cancelar').addEventListener('click', function () {
+    document.getElementById('modal-import-backdrop').classList.remove('open');
+  });
+  document.getElementById('modal-import-backdrop').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+
+  document.getElementById('btn-baixar-modelo').addEventListener('click', function () {
+    var conteudo = 'Cliente,Modelo,Credito,Plano,Telefone,CPF,Vendedor,DataVenda,PosVendas,Parcela2Vencimento,Parcela2Status,Parcela3Vencimento,Parcela3Status\n' +
+      'Thiago Lameu da Silva,Moto,"R$ 52.414,29",ON,(18) 99626-7134,387.165.758-14,Pedro,09/09/2026,Concluído,10/10/2026,Pendente,10/11/2026,Pendente\n';
+    var blob = new Blob([conteudo], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'modelo-rsf.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('import-file').addEventListener('change', function (e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      var linhas = parseCSV(ev.target.result);
+      var validas = [];
+      var semVinculo = 0;
+      linhas.forEach(function (row) {
+        if (!row['Cliente']) return;
+        var uidEncontrado = resolverUidPorNome(row['Vendedor']);
+        if (!uidEncontrado) semVinculo++;
+        validas.push({
+          nome: row['Cliente'] || '',
+          modelo: row['Modelo'] || '',
+          credito: row['Credito'] || '',
+          plano: normalizarTexto(row['Plano']) === 'off' ? 'OFF' : 'ON',
+          telefone: row['Telefone'] || '',
+          cpf: row['CPF'] || '',
+          dataVenda: parseDataBR(row['DataVenda']) || '',
+          posVendasStatus: normalizarTexto(row['PosVendas']).indexOf('conclu') > -1 ? 'concluido' : 'pendente',
+          parcela2: { vencimento: parseDataBR(row['Parcela2Vencimento']), status: normalizarTexto(row['Parcela2Status']).indexOf('pago') > -1 ? 'pago' : 'pendente' },
+          parcela3: { vencimento: parseDataBR(row['Parcela3Vencimento']), status: normalizarTexto(row['Parcela3Status']).indexOf('pago') > -1 ? 'pago' : 'pendente' },
+          vendedorNome: (row['Vendedor'] || '').trim() || currentUser.nome,
+          vendedorUid: uidEncontrado || null,
+          importadoEm: new Date().toISOString(),
+          criadoEm: new Date().toISOString()
+        });
+      });
+      linhasParaImportar = validas;
+      document.getElementById('import-preview').innerHTML =
+        '<div class="note">' + validas.length + ' cliente(s) encontrados no arquivo.' +
+        (semVinculo ? ' ' + semVinculo + ' sem vendedor reconhecido — ficam visíveis só pra você até vincular editando o cliente depois.' : '') +
+        (validas.length === 0 ? ' Confira se a coluna "Cliente" está preenchida.' : '') +
+        '</div>';
+      document.getElementById('btn-import-confirmar').disabled = validas.length === 0;
+    };
+    reader.readAsText(file, 'UTF-8');
+  });
+
+  document.getElementById('btn-import-confirmar').addEventListener('click', function () {
+    if (!linhasParaImportar.length) return;
+    var botao = this;
+    botao.disabled = true;
+    botao.textContent = 'Importando...';
+    var CHUNK = 400, idx = 0;
+    function proximoLote() {
+      if (idx >= linhasParaImportar.length) {
+        botao.textContent = 'Importado!';
+        setTimeout(function () {
+          document.getElementById('modal-import-backdrop').classList.remove('open');
+          botao.disabled = false;
+          botao.textContent = 'Confirmar importação';
+        }, 1200);
+        return;
+      }
+      var lote = linhasParaImportar.slice(idx, idx + CHUNK);
+      var batch = db.batch();
+      lote.forEach(function (doc) { batch.set(db.collection('clientes').doc(), doc); });
+      batch.commit().then(function () { idx += CHUNK; proximoLote(); })
+        .catch(function (err) {
+          alert('Erro ao importar: ' + (err && err.message || 'tente novamente.'));
+          botao.disabled = false;
+          botao.textContent = 'Confirmar importação';
+        });
+    }
+    proximoLote();
+  });
+
+  document.getElementById('busca').addEventListener('input', renderAll);
   document.getElementById('tabela-body').addEventListener('click', function (e) {
     var btn = e.target.closest('[data-action="editar"]');
     if (btn) abrirModalEditar(btn.dataset.id);
@@ -873,9 +1169,38 @@
       document.querySelectorAll('.view-btn').forEach(function (b) { b.classList.remove('active'); });
       btn.classList.add('active');
       viewMode = btn.dataset.view;
+      filtroVendedorUid = '';
+      var sel = document.getElementById('vendedor-filter');
+      if (sel) sel.value = '';
+      var wrap = document.getElementById('vendedor-filter-wrap');
+      if (wrap) wrap.style.display = (viewMode === 'team') ? 'inline-block' : 'none';
       subscribeClientes();
     });
   });
+
+  var vendedorFilterEl = document.getElementById('vendedor-filter');
+  if (vendedorFilterEl) {
+    vendedorFilterEl.addEventListener('change', function () {
+      filtroVendedorUid = this.value;
+      renderAll();
+    });
+  }
+
+  function subscribeUsuariosSeAdmin() {
+    db.collection('usuarios').onSnapshot(function (snap) {
+      usuariosMap = {};
+      snap.docs.forEach(function (d) { usuariosMap[d.id] = d.data() || {}; });
+      renderVendedorFilterOptions();
+    }, function (err) { console.error('Erro ao ler usuarios:', err); });
+  }
+
+  function subscribeMetaMensal() {
+    db.collection('config').doc('metaMensal').onSnapshot(function (snap) {
+      var d = snap.exists ? snap.data() : null;
+      metaMensalValor = d && d.valor ? d.valor : 0;
+      renderAll();
+    }, function (err) { console.error('Erro ao ler meta mensal:', err); });
+  }
 
   // ---------- login / cadastro / sessão ----------
 
@@ -963,9 +1288,15 @@
       document.getElementById('app-screen').style.display = 'block';
       document.getElementById('who-name').textContent = currentUser.nome + (currentUser.role === 'admin' ? ' · admin' : '');
       document.getElementById('view-switch').style.display = currentUser.role === 'admin' ? 'flex' : 'none';
+      document.getElementById('btn-importar').style.display = currentUser.role === 'admin' ? 'inline-block' : 'none';
       viewMode = 'mine';
+      filtroVendedorUid = '';
       document.querySelectorAll('.view-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.view === 'mine'); });
+      var wrap = document.getElementById('vendedor-filter-wrap');
+      if (wrap) wrap.style.display = 'none';
 
+      if (currentUser.role === 'admin') subscribeUsuariosSeAdmin();
+      subscribeMetaMensal();
       subscribeClientes();
     });
   });
