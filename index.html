@@ -184,7 +184,7 @@
   input.search { flex: 1; min-width: 160px; }
 
   .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
-  table { border-collapse: collapse; width: 100%; min-width: 1180px; }
+  table { border-collapse: collapse; width: 100%; min-width: 1550px; }
   th, td { text-align: left; padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.02em; color: var(--ink-soft); background: var(--surface-2); }
   tbody tr:last-child td { border-bottom: none; }
@@ -320,10 +320,14 @@
               <th>Cliente</th>
               <th>Modelo</th>
               <th>Valor</th>
+              <th>Plano</th>
               <th>Telefone</th>
               <th>CPF</th>
               <th>Vendedor</th>
+              <th>Equipe</th>
               <th>Data da venda</th>
+              <th>Próxima assembleia</th>
+              <th>Pagamento</th>
               <th>Pós-venda</th>
               <th>Parcela 2</th>
               <th>Parcela 3</th>
@@ -377,17 +381,25 @@
         </div>
         <div class="form-field">
           <label>Modelo</label>
-          <input class="field" name="modelo" placeholder="Moto, Imóvel...">
+          <input class="field" name="modelo" placeholder="Moto, Imóvel, F900 GS...">
         </div>
         <div class="form-field">
           <label>Crédito</label>
           <input class="field" name="credito" placeholder="R$ 52.414,29">
         </div>
         <div class="form-field">
+          <label>Tipo</label>
+          <select class="field" name="tipo" id="campo-tipo">
+            <option value="moto">Moto (Kawasaki)</option>
+            <option value="bmw">BMW (carta de crédito)</option>
+            <option value="imovel">Imóvel</option>
+          </select>
+        </div>
+        <div class="form-field">
           <label>Plano</label>
           <select class="field" name="plano">
-            <option value="ON">ON</option>
-            <option value="OFF">OFF</option>
+            <option value="Normal">Normal</option>
+            <option value="Premium">Premium</option>
           </select>
         </div>
         <div class="form-field">
@@ -399,34 +411,35 @@
           <input class="field" name="cpf" placeholder="000.000.000-00">
         </div>
         <div class="form-field">
+          <label>Equipe</label>
+          <input class="field" name="equipe" value="Camaleões">
+        </div>
+        <div class="form-field">
           <label>Data da venda</label>
           <input class="field" type="date" name="dataVenda" required>
+        </div>
+        <div class="form-field">
+          <label>Próxima assembleia</label>
+          <input class="field" type="date" name="proximaAssembleia">
+        </div>
+        <div class="form-field">
+          <label>Pagamento</label>
+          <select class="field" name="pagamento">
+            <option value="concluido">Concluído</option>
+            <option value="sinal">Sinal</option>
+          </select>
         </div>
         <div class="form-field">
           <label>Status do pós-venda</label>
           <select class="field" name="posVendasStatus">
             <option value="pendente">Pendente</option>
             <option value="concluido">Concluído</option>
+            <option value="cancelado">Cancelado</option>
           </select>
         </div>
         <div class="form-field" id="campo-vendedor-admin" style="display:none;">
           <label>Vendedor (nome)</label>
           <input class="field" name="vendedorNomeManual" placeholder="Nome do vendedor">
-        </div>
-        <div class="form-field">
-          <label>Tipo</label>
-          <select class="field" name="tipo" id="campo-tipo">
-            <option value="moto">Moto (Kawasaki)</option>
-            <option value="bmw">BMW (carta de crédito)</option>
-            <option value="imovel">Imóvel</option>
-          </select>
-        </div>
-        <div class="form-field" id="campo-premium-wrap">
-          <label>É plano Premium?</label>
-          <select class="field" name="premium">
-            <option value="nao">Não</option>
-            <option value="sim">Sim</option>
-          </select>
         </div>
 
         <div class="full parcela-block">
@@ -466,9 +479,9 @@
   <div class="modal">
     <h3>Importar planilha</h3>
     <div class="note">
-      Arquivo CSV com as colunas: <strong>Cliente, Modelo, Credito, Plano, Telefone, CPF, Vendedor, Tipo, Premium, DataVenda, PosVendas, Parcela2Vencimento, Parcela2Status, Parcela3Vencimento, Parcela3Status</strong>.
-      Tipo aceita Moto, BMW ou Imóvel; Premium aceita Sim/Não (só vale pra Moto/BMW).
-      Datas no formato DD/MM/AAAA. PosVendas e os status das parcelas aceitam "Concluído"/"Pendente"/"Pago" em qualquer maiúscula/minúscula.
+      Arquivo CSV com as colunas: <strong>Cliente, Modelo, Credito, Plano, Telefone, CPF, Vendedor, Equipe, Tipo, DataVenda, ProximaAssembleia, Pagamento, PosVendas, Parcela2Vencimento, Parcela2Status, Parcela3Vencimento, Parcela3Status</strong>.
+      Plano aceita Normal/Premium; Tipo é opcional (Moto/BMW/Imóvel) — se não vier, usamos o texto do Modelo pra adivinhar; Pagamento aceita Concluído/Sinal; PosVendas aceita Concluído/Pendente/Cancelado.
+      Datas no formato DD/MM/AAAA. Os status das parcelas aceitam "Pendente"/"Pago" em qualquer maiúscula/minúscula.
       O nome em "Vendedor" precisa ser igual ao nome que a pessoa usou ao criar a conta no RSF pra vincular certinho — senão o cliente entra sem vínculo e você associa depois editando.
     </div>
     <div class="toolbar">
@@ -607,7 +620,7 @@
   // ---------- geração de ações (mesma lógica de negócio do painel anterior) ----------
 
   function gerarAcaoPosVenda(c) {
-    if (c.posVendasStatus === 'concluido') return null;
+    if (c.posVendasStatus === 'concluido' || c.posVendasStatus === 'cancelado') return null;
     var venda = parseISODate(c.dataVenda);
     if (!venda) return null;
     var hoje = todayDate();
@@ -663,6 +676,32 @@
     return { clienteId: c.id, cliente: c, tipo: 'Parcela ' + n, parcelaN: n, urgencia: urgencia, infoLabel: infoLabel, mensagem: mensagem, prazoTime: venc.getTime() };
   }
 
+  function gerarAcaoSinal(c) {
+    if ((c.pagamento || 'concluido') !== 'sinal') return null;
+    var venda = parseISODate(c.dataVenda);
+    if (!venda) return null;
+    var prazo = new Date(venda.getFullYear(), venda.getMonth() + 1, 0); // último dia do mês da venda
+    var hoje = todayDate();
+    var dias = diffDias(prazo, hoje);
+    var nome = primeiroNome(c.nome);
+    var urgencia, mensagem, infoLabel;
+
+    if (dias < 0) {
+      urgencia = 'atrasado'; infoLabel = 'Prazo do sinal vencido — avalie reduzir a cota ou tirar da produção';
+      mensagem = nome + ', o prazo pra completar o valor do sinal já venceu e o restante ainda não foi pago. Precisamos resolver agora — pode falar comigo?';
+    } else if (dias === 0) {
+      urgencia = 'hoje'; infoLabel = 'Último dia pra completar o sinal';
+      mensagem = nome + ', hoje é o último dia pra completar o restante do valor do sinal. Vamos fechar isso agora?';
+    } else if (dias <= 3) {
+      urgencia = 'urgente'; infoLabel = 'Faltam ' + dias + ' dia(s) pra completar o sinal';
+      mensagem = nome + ', faltam ' + dias + ' dia(s) pra completar o restante do sinal antes do fim do mês. Vamos resolver logo?';
+    } else {
+      urgencia = 'atencao'; infoLabel = 'Faltam ' + dias + ' dias pra completar o sinal (fim do mês)';
+      mensagem = nome + ', só lembrando: o restante do sinal precisa ser completado até o fim do mês (' + formatData(prazo) + ').';
+    }
+    return { clienteId: c.id, cliente: c, tipo: 'Sinal', urgencia: urgencia, infoLabel: infoLabel, mensagem: mensagem, prazoTime: prazo.getTime() };
+  }
+
   var ORDEM_URGENCIA = { atrasado: 0, hoje: 1, urgente: 2, atencao: 3, leve: 4 };
 
   function gerarTodasAcoes(lista) {
@@ -671,6 +710,7 @@
       var a1 = gerarAcaoPosVenda(c); if (a1) acoes.push(a1);
       var a2 = gerarAcaoParcela(c, 2); if (a2) acoes.push(a2);
       var a3 = gerarAcaoParcela(c, 3); if (a3) acoes.push(a3);
+      var a4 = gerarAcaoSinal(c); if (a4) acoes.push(a4);
     });
     acoes.sort(function (x, y) {
       var ord = ORDEM_URGENCIA[x.urgencia] - ORDEM_URGENCIA[y.urgencia];
@@ -700,7 +740,7 @@
     return count;
   }
   function vendaFromCliente(c) {
-    return { tipo: c.tipo === 'imovel' ? 'imovel' : (c.tipo === 'bmw' ? 'bmw' : 'moto'), premium: !!c.premium, valor: parseMoeda(c.credito), ordemEspecial: c.ordemEspecial || null };
+    return { tipo: c.tipo === 'imovel' ? 'imovel' : (c.tipo === 'bmw' ? 'bmw' : 'moto'), premium: c.plano === 'Premium', valor: parseMoeda(c.credito), ordemEspecial: c.ordemEspecial || null };
   }
 
   // Faixas de comissão — motos Kawasaki e cartas BMW entram na MESMA tabela e no mesmo total de produção.
@@ -759,17 +799,17 @@
     var motos = vendasMesClientes.filter(function (c) { return (c.tipo || 'moto') !== 'imovel'; });
     var producaoMoto = motos.reduce(function (s, c) { return s + parseMoeda(c.credito); }, 0);
     var passou500 = producaoMoto >= 500000;
-    var qtdPremium = motos.filter(function (c) { return !!c.premium; }).length;
+    var qtdPremium = motos.filter(function (c) { return c.plano === 'Premium'; }).length;
     var bonusAtivo = passou500 && qtdPremium >= 4;
     return motos.map(function (c, i) {
       var valor = parseMoeda(c.credito);
       var especial = c.ordemEspecial === '1' || c.ordemEspecial === '2';
       var taxa, motivo;
       if (especial) { taxa = taxaPremium(producaoMoto); motivo = (c.ordemEspecial === '1' ? '1ª' : '2ª') + ' venda do mês (tabela Premium)'; }
-      else if (c.premium) { taxa = taxaPremium(producaoMoto); motivo = 'Premium'; }
+      else if (c.plano === 'Premium') { taxa = taxaPremium(producaoMoto); motivo = 'Premium'; }
       else { taxa = taxaNormal(producaoMoto); motivo = 'Normal'; }
       var comissao = valor * taxa;
-      var bonus = (c.premium && bonusAtivo) ? 100 : 0;
+      var bonus = (c.plano === 'Premium' && bonusAtivo) ? 100 : 0;
       return { cliente: c, ordem: i + 1, valor: valor, taxa: taxa, motivo: motivo, comissao: comissao, bonus: bonus };
     });
   }
@@ -913,6 +953,8 @@
       var idAttr = 'acao-msg-' + idx;
       var concluirBtn = a.tipo === 'Pós-venda'
         ? '<button class="btn" data-action="concluir-posvenda" data-id="' + a.clienteId + '">Marcar pós-venda concluído</button>'
+        : a.tipo === 'Sinal'
+        ? '<button class="btn" data-action="concluir-sinal" data-id="' + a.clienteId + '">Marcar sinal concluído</button>'
         : '<button class="btn" data-action="marcar-paga" data-id="' + a.clienteId + '" data-n="' + a.parcelaN + '">Marcar parcela ' + a.parcelaN + ' como paga</button>';
       var vendedorTag = viewMode === 'team' ? '<span class="acao-vendedor">· ' + escapeHtml(a.cliente.vendedorNome || '') + '</span>' : '';
       return '' +
@@ -933,6 +975,7 @@
   }
 
   function statusPosVendaBadge(c) {
+    if (c.posVendasStatus === 'cancelado') return '<span class="badge neutro">Cancelado</span>';
     if (c.posVendasStatus === 'concluido') return '<span class="badge ok">Concluído</span>';
     var prazo = calcPrazoPosVenda(c.dataVenda);
     if (!prazo) return '<span class="badge neutro">Pendente</span>';
@@ -952,6 +995,26 @@
     if (dias <= 5) return '<span class="badge atencao">vence em ' + dias + 'd</span>';
     return '<span class="badge neutro">vence em ' + dias + 'd</span>';
   }
+  function statusPagamentoBadge(c) {
+    if ((c.pagamento || 'concluido') !== 'sinal') return '<span class="badge ok">Concluído</span>';
+    var venda = parseISODate(c.dataVenda);
+    if (!venda) return '<span class="badge atencao">Sinal</span>';
+    var prazo = new Date(venda.getFullYear(), venda.getMonth() + 1, 0);
+    var dias = diffDias(prazo, todayDate());
+    if (dias < 0) return '<span class="badge atrasado">Sinal atrasado</span>';
+    if (dias <= 3) return '<span class="badge urgente">Sinal — ' + dias + 'd</span>';
+    return '<span class="badge atencao">Sinal — ' + dias + 'd</span>';
+  }
+  function assembleiaBadge(c) {
+    if (!c.proximaAssembleia) return '<span class="badge neutro">sem data</span>';
+    var d = parseISODate(c.proximaAssembleia);
+    if (!d) return '<span class="badge neutro">sem data</span>';
+    var dias = diffDias(d, todayDate());
+    var texto = formatData(d);
+    if (dias < 0) return '<span class="badge atrasado">' + texto + ' — atualizar</span>';
+    if (dias <= 14) return '<span class="badge atencao">' + texto + '</span>';
+    return '<span class="badge neutro">' + texto + '</span>';
+  }
 
   function renderTabela(listaBase) {
     var termo = (document.getElementById('busca').value || '').toLowerCase();
@@ -968,16 +1031,20 @@
       var dv = parseISODate(c.dataVenda);
       var vendedorCel = escapeHtml(c.vendedorNome || '—') + (c.vendedorUid ? '' : ' <span class="badge neutro">não vinculado</span>');
       var tipoTag = c.tipo === 'imovel' ? '🏠 ' : (c.tipo === 'bmw' ? '🅱️ ' : '');
-      var premiumTag = c.premium ? ' ⭐' : '';
+      var premiumTag = c.plano === 'Premium' ? ' ⭐' : '';
       return '' +
         '<tr>' +
         '<td class="nome">' + escapeHtml(c.nome) + '</td>' +
         '<td>' + tipoTag + escapeHtml(c.modelo || '—') + premiumTag + '</td>' +
         '<td>' + escapeHtml(c.credito || '—') + '</td>' +
+        '<td>' + escapeHtml(c.plano || 'Normal') + '</td>' +
         '<td>' + escapeHtml(c.telefone || '—') + '</td>' +
         '<td>' + escapeHtml(c.cpf || '—') + '</td>' +
         '<td>' + vendedorCel + '</td>' +
+        '<td>' + escapeHtml(c.equipe || '—') + '</td>' +
         '<td>' + (dv ? formatData(dv) : '—') + '</td>' +
+        '<td>' + assembleiaBadge(c) + '</td>' +
+        '<td>' + statusPagamentoBadge(c) + '</td>' +
         '<td>' + statusPosVendaBadge(c) + '</td>' +
         '<td>' + statusParcelaBadge(c, 2) + '</td>' +
         '<td>' + statusParcelaBadge(c, 3) + '</td>' +
@@ -1218,8 +1285,8 @@
     editingId = null;
     document.getElementById('modal-title').textContent = 'Novo cliente';
     form.reset();
+    form.equipe.value = 'Camaleões';
     campoVendedorAdmin.style.display = currentUser.role === 'admin' ? 'block' : 'none';
-    document.getElementById('campo-premium-wrap').style.display = 'block';
     btnExcluir.style.display = 'none';
     backdrop.classList.add('open');
   }
@@ -1232,14 +1299,15 @@
     form.nome.value = c.nome || '';
     form.modelo.value = c.modelo || '';
     form.credito.value = c.credito || '';
-    form.plano.value = c.plano || 'ON';
+    form.plano.value = c.plano || 'Normal';
     form.telefone.value = c.telefone || '';
     form.cpf.value = c.cpf || '';
+    form.equipe.value = c.equipe || 'Camaleões';
     form.dataVenda.value = c.dataVenda || '';
+    form.proximaAssembleia.value = c.proximaAssembleia || '';
+    form.pagamento.value = c.pagamento || 'concluido';
     form.posVendasStatus.value = c.posVendasStatus || 'pendente';
     form.tipo.value = c.tipo || 'moto';
-    form.premium.value = c.premium ? 'sim' : 'nao';
-    document.getElementById('campo-premium-wrap').style.display = form.tipo.value === 'imovel' ? 'none' : 'block';
     if (form.vendedorNomeManual) form.vendedorNomeManual.value = c.vendedorNome || '';
     form.parcela2Vencimento.value = (c.parcela2 && c.parcela2.vencimento) || '';
     form.parcela2Status.value = (c.parcela2 && c.parcela2.status) || 'pendente';
@@ -1250,10 +1318,6 @@
     backdrop.classList.add('open');
   }
   function fecharModal() { backdrop.classList.remove('open'); editingId = null; }
-
-  document.getElementById('campo-tipo').addEventListener('change', function () {
-    document.getElementById('campo-premium-wrap').style.display = this.value === 'imovel' ? 'none' : 'block';
-  });
 
   document.getElementById('btn-novo').addEventListener('click', abrirModalNovo);
   document.getElementById('fab-novo').addEventListener('click', abrirModalNovo);
@@ -1268,13 +1332,15 @@
       nome: (fd.get('nome') || '').trim(),
       modelo: (fd.get('modelo') || '').trim(),
       credito: (fd.get('credito') || '').trim(),
-      plano: fd.get('plano'),
+      plano: fd.get('plano') === 'Premium' ? 'Premium' : 'Normal',
       telefone: (fd.get('telefone') || '').trim(),
       cpf: (fd.get('cpf') || '').trim(),
+      equipe: (fd.get('equipe') || '').trim(),
       dataVenda: fd.get('dataVenda'),
+      proximaAssembleia: fd.get('proximaAssembleia') || null,
+      pagamento: fd.get('pagamento') === 'sinal' ? 'sinal' : 'concluido',
       posVendasStatus: fd.get('posVendasStatus'),
       tipo: (fd.get('tipo') === 'imovel' || fd.get('tipo') === 'bmw') ? fd.get('tipo') : 'moto',
-      premium: fd.get('tipo') !== 'imovel' && fd.get('premium') === 'sim',
       parcela2: { vencimento: fd.get('parcela2Vencimento') || null, status: fd.get('parcela2Status') },
       parcela3: { vencimento: fd.get('parcela3Vencimento') || null, status: fd.get('parcela3Status') }
     };
@@ -1360,8 +1426,8 @@
   });
 
   document.getElementById('btn-baixar-modelo').addEventListener('click', function () {
-    var conteudo = 'Cliente,Modelo,Credito,Plano,Telefone,CPF,Vendedor,Tipo,Premium,DataVenda,PosVendas,Parcela2Vencimento,Parcela2Status,Parcela3Vencimento,Parcela3Status\n' +
-      'Thiago Lameu da Silva,Moto,"R$ 52.414,29",ON,(18) 99626-7134,387.165.758-14,Pedro,Moto,Nao,09/09/2026,Concluído,10/10/2026,Pendente,10/11/2026,Pendente\n';
+    var conteudo = 'Cliente,Modelo,Credito,Plano,Telefone,CPF,Vendedor,Equipe,Tipo,DataVenda,ProximaAssembleia,Pagamento,PosVendas,Parcela2Vencimento,Parcela2Status,Parcela3Vencimento,Parcela3Status\n' +
+      'Thiago Lameu da Silva,Moto,"R$ 52.414,29",Normal,(18) 99626-7134,387.165.758-14,Pedro,Camaleões,Moto,09/09/2026,10/10/2026,Concluído,Concluído,10/10/2026,Pendente,10/11/2026,Pendente\n';
     var blob = new Blob([conteudo], { type: 'text/csv;charset=utf-8;' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -1382,19 +1448,24 @@
         if (!row['Cliente']) return;
         var uidEncontrado = resolverUidPorNome(row['Vendedor']);
         if (!uidEncontrado) semVinculo++;
-        var tipoNorm = normalizarTexto(row['Tipo']);
+        var baseTipo = row['Tipo'] ? row['Tipo'] : row['Modelo'];
+        var tipoNorm = normalizarTexto(baseTipo);
         var tipo = tipoNorm.indexOf('imov') > -1 ? 'imovel' : (tipoNorm.indexOf('bmw') > -1 ? 'bmw' : 'moto');
+        var posNorm = normalizarTexto(row['PosVendas']);
+        var posVendasStatus = posNorm.indexOf('cancel') > -1 ? 'cancelado' : (posNorm.indexOf('conclu') > -1 ? 'concluido' : 'pendente');
         validas.push({
           nome: row['Cliente'] || '',
           modelo: row['Modelo'] || '',
           credito: row['Credito'] || '',
-          plano: normalizarTexto(row['Plano']) === 'off' ? 'OFF' : 'ON',
+          plano: normalizarTexto(row['Plano']).indexOf('premium') > -1 ? 'Premium' : 'Normal',
           telefone: row['Telefone'] || '',
           cpf: row['CPF'] || '',
+          equipe: row['Equipe'] || 'Camaleões',
           tipo: tipo,
-          premium: tipo !== 'imovel' && normalizarTexto(row['Premium']).indexOf('sim') > -1,
           dataVenda: parseDataBR(row['DataVenda']) || '',
-          posVendasStatus: normalizarTexto(row['PosVendas']).indexOf('conclu') > -1 ? 'concluido' : 'pendente',
+          proximaAssembleia: parseDataBR(row['ProximaAssembleia']) || null,
+          pagamento: normalizarTexto(row['Pagamento']).indexOf('sinal') > -1 ? 'sinal' : 'concluido',
+          posVendasStatus: posVendasStatus,
           parcela2: { vencimento: parseDataBR(row['Parcela2Vencimento']), status: normalizarTexto(row['Parcela2Status']).indexOf('pago') > -1 ? 'pago' : 'pendente' },
           parcela3: { vencimento: parseDataBR(row['Parcela3Vencimento']), status: normalizarTexto(row['Parcela3Status']).indexOf('pago') > -1 ? 'pago' : 'pendente' },
           vendedorNome: (row['Vendedor'] || '').trim() || currentUser.nome,
@@ -1470,6 +1541,12 @@
     var concluirBtn = t.closest('[data-action="concluir-posvenda"]');
     if (concluirBtn) {
       db.collection('clientes').doc(concluirBtn.dataset.id).update({ posVendasStatus: 'concluido', posVendasConcluidoEm: new Date().toISOString() })
+        .catch(function () { alert('Não foi possível atualizar.'); });
+      return;
+    }
+    var concluirSinalBtn = t.closest('[data-action="concluir-sinal"]');
+    if (concluirSinalBtn) {
+      db.collection('clientes').doc(concluirSinalBtn.dataset.id).update({ pagamento: 'concluido' })
         .catch(function () { alert('Não foi possível atualizar.'); });
       return;
     }
