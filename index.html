@@ -166,6 +166,14 @@
   .acao-card.atencao { border-left-color: var(--amarelo); }
   .acao-card.leve { border-left-color: var(--verde); }
   .acao-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .acao-check {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 999px;
+    border: 1.5px solid var(--verde); background: var(--surface); color: var(--verde);
+    font-weight: 700; font-size: 14px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .acao-check:hover { background: var(--verde-bg); }
+  .acao-check.feito { background: var(--verde); color: #fff; }
   .acao-nome { font-weight: 700; font-size: 15px; }
   .acao-vendedor { font-size: 11.5px; color: var(--ink-soft); }
   .acao-info { font-size: 12.5px; color: var(--ink-soft); margin-left: auto; }
@@ -623,6 +631,32 @@
 
   // ---------- geração de ações (mesma lógica de negócio do painel anterior) ----------
 
+  // ---------- variação de mensagens ----------
+
+  function hashStr(s) {
+    var h = 0;
+    for (var i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0; }
+    return Math.abs(h);
+  }
+  function variante(lista, seed) {
+    if (lista.length === 1) return lista[0];
+    return lista[hashStr(seed) % lista.length];
+  }
+  // dias desde o último contato registrado pra esse tipo de ação nesse cliente (null = nunca)
+  function diasDesdeContato(c, tipoKey) {
+    var iso = c.ultimoContato && c.ultimoContato[tipoKey];
+    if (!iso) return null;
+    var d = parseISODate(iso);
+    if (!d) return null;
+    return diffDias(todayDate(), d);
+  }
+  // regra: no mínimo 3 dias entre contatos pro mesmo assunto — exceto quando já é hoje/atrasado (não perde o item de vista)
+  function dentroDoCooldown(c, tipoKey, urgencia) {
+    if (urgencia === 'hoje' || urgencia === 'atrasado') return false;
+    var dias = diasDesdeContato(c, tipoKey);
+    return dias !== null && dias < 3;
+  }
+
   function gerarAcaoPosVenda(c) {
     if (c.posVendasStatus === 'concluido' || c.posVendasStatus === 'cancelado') return null;
     var venda = parseISODate(c.dataVenda);
@@ -632,28 +666,53 @@
     var diasDesdeVenda = diffDias(hoje, venda);
     var diasRestantes = diffDias(prazo, hoje);
     var nome = primeiroNome(c.nome);
-    var urgencia, mensagem, infoLabel;
+    var urgencia, infoLabel, variantes, seed;
 
     if (diasDesdeVenda <= 1) {
       urgencia = 'leve'; infoLabel = 'Venda recente';
-      mensagem = 'Oi ' + nome + '! Que alegria ter você com a gente 🎉 Pra deixar tudo certinho, baixe o app e finalize seu pós-venda por lá — leva só uns minutos. Qualquer dúvida, me chama que eu te ajudo passo a passo!';
+      variantes = [
+        'Oi ' + nome + '! Que alegria ter você com a gente 🎉 Pra deixar tudo certinho, baixe o app e finalize seu pós-venda por lá — leva só uns minutos. Qualquer dúvida, me chama que eu te ajudo passo a passo!',
+        nome + ', seja muito bem-vindo(a)! 🎉 Um passo importante agora: baixar o app e concluir seu cadastro de pós-venda. É rapidinho, e eu tô aqui se precisar de ajuda.',
+        'Oi ' + nome + ', tudo bem? Só confirmando que você já tem o app instalado e sabe como finalizar seu pós-venda. Qualquer dúvida, é só chamar!'
+      ];
     } else if (diasRestantes < 0) {
       urgencia = 'atrasado'; infoLabel = 'Prazo vencido há ' + Math.abs(diasRestantes) + ' dia(s)';
-      mensagem = nome + ', seu pós-venda já passou do prazo e isso pode afetar seu plano. Vamos resolver agora mesmo? Me chama que eu te oriento passo a passo pra regularizar hoje.';
+      variantes = [
+        nome + ', seu pós-venda já passou do prazo e isso pode afetar seu plano. Vamos resolver agora mesmo? Me chama que eu te oriento passo a passo pra regularizar hoje.',
+        nome + ', precisamos regularizar seu pós-venda o quanto antes — o prazo já passou. Vamos resolver juntos agora?',
+        nome + ', o prazo do seu pós-venda venceu e isso é sério pro seu plano. Me chama agora que resolvemos rapidinho, sem complicação.'
+      ];
     } else if (diasRestantes === 0) {
       urgencia = 'hoje'; infoLabel = 'Prazo termina hoje';
-      mensagem = nome + ', hoje é o último dia pra concluir seu pós-venda! Vamos fazer isso juntos agora, rapidinho, pra não perder nenhum benefício do seu plano.';
+      variantes = [
+        nome + ', hoje é o último dia pra concluir seu pós-venda! Vamos fazer isso juntos agora, rapidinho, pra não perder nenhum benefício do seu plano.',
+        nome + ', hoje é o prazo final do pós-venda. Posso te ajudar agora mesmo pra garantir que está tudo certo?'
+      ];
     } else if (diasRestantes <= 4) {
       urgencia = 'urgente'; infoLabel = 'Faltam ' + diasRestantes + ' dia(s) pro prazo';
-      mensagem = nome + ', faltam só ' + diasRestantes + ' dia(s) pra concluir o pós-venda e garantir tudo certinho no seu plano. Bora finalizar agora? Estou aqui pra te ajudar no que precisar.';
+      variantes = [
+        nome + ', faltam só ' + diasRestantes + ' dia(s) pra concluir o pós-venda e garantir tudo certinho no seu plano. Bora finalizar agora? Estou aqui pra te ajudar no que precisar.',
+        nome + ', atenção: restam apenas ' + diasRestantes + ' dia(s) pro prazo do pós-venda. Vamos resolver isso hoje mesmo?',
+        'Oi ' + nome + ', o prazo tá bem perto (faltam ' + diasRestantes + ' dia(s)). Consigo te ajudar agora a finalizar — topa?'
+      ];
     } else if (diasRestantes <= 9) {
       urgencia = 'atencao'; infoLabel = 'Faltam ' + diasRestantes + ' dias pro prazo';
-      mensagem = nome + ', tudo certo? Faltam ' + diasRestantes + ' dias pro prazo do seu pós-venda — vamos fechar isso hoje? Se quiser, eu te ajudo agora mesmo com o passo a passo.';
+      variantes = [
+        nome + ', tudo certo? Faltam ' + diasRestantes + ' dias pro prazo do seu pós-venda — vamos fechar isso hoje? Se quiser, eu te ajudo agora mesmo com o passo a passo.',
+        'Oi ' + nome + ', o prazo do pós-venda está se aproximando (faltam ' + diasRestantes + ' dias). Bora garantir isso ainda essa semana?',
+        nome + ', só um lembrete amigável: restam ' + diasRestantes + ' dias pra concluir o pós-venda. Se precisar de ajuda, me chama que resolvemos rapidinho.'
+      ];
     } else {
       urgencia = 'leve'; infoLabel = 'Prazo em ' + diasRestantes + ' dias';
-      mensagem = 'Oi ' + nome + ', tudo bem? Passando aqui só pra saber se você já conseguiu fazer seu cadastro no app. Se travar em algum passo, me avisa que resolvemos juntos!';
+      variantes = [
+        'Oi ' + nome + ', tudo bem? Passando aqui só pra saber se você já conseguiu fazer seu cadastro no app. Se travar em algum passo, me avisa que resolvemos juntos!',
+        nome + ', como estão as coisas? Só confirmando se o pós-venda no app já foi feito — se precisar de uma mãozinha, é só chamar.',
+        'Oi ' + nome + '! Passando pra saber se ficou alguma dúvida sobre o pós-venda no app. Sempre que precisar, estou por aqui.'
+      ];
     }
-    return { clienteId: c.id, cliente: c, tipo: 'Pós-venda', urgencia: urgencia, infoLabel: infoLabel, mensagem: mensagem, prazoTime: prazo.getTime() };
+    if (dentroDoCooldown(c, 'posvenda', urgencia)) return null;
+    seed = c.id + '|posvenda|' + urgencia + '|' + diasRestantes;
+    return { clienteId: c.id, cliente: c, tipo: 'Pós-venda', tipoKey: 'posvenda', urgencia: urgencia, infoLabel: infoLabel, mensagem: variante(variantes, seed), prazoTime: prazo.getTime() };
   }
 
   function gerarAcaoParcela(c, n) {
@@ -665,19 +724,32 @@
     var hoje = todayDate();
     var dias = diffDias(venc, hoje);
     var nome = primeiroNome(c.nome);
-    var urgencia, mensagem, infoLabel;
+    var data = formatData(venc);
+    var urgencia, infoLabel, variantes;
 
     if (dias < 0) {
       urgencia = 'atrasado'; infoLabel = 'Vencida há ' + Math.abs(dias) + ' dia(s)';
-      mensagem = nome + ', notei que sua ' + n + 'ª parcela venceu em ' + formatData(venc) + ' e ainda está em aberto. Vamos regularizar hoje? Se estiver passando por algum aperto, me conta que a gente vê a melhor solução juntos.';
+      variantes = [
+        nome + ', notei que sua ' + n + 'ª parcela venceu em ' + data + ' e ainda está em aberto. Vamos regularizar hoje? Se estiver passando por algum aperto, me conta que a gente vê a melhor solução juntos.',
+        nome + ', sua ' + n + 'ª parcela está em atraso desde ' + data + '. Podemos conversar hoje sobre a melhor forma de regularizar?'
+      ];
     } else if (dias === 0) {
       urgencia = 'hoje'; infoLabel = 'Vence hoje';
-      mensagem = nome + ', sua ' + n + 'ª parcela vence hoje (' + formatData(venc) + '). Consegue confirmar o pagamento? Se precisar de ajuda com a forma de pagamento, é só falar comigo.';
+      variantes = [
+        nome + ', sua ' + n + 'ª parcela vence hoje (' + data + '). Consegue confirmar o pagamento? Se precisar de ajuda com a forma de pagamento, é só falar comigo.',
+        nome + ', hoje é o vencimento da sua ' + n + 'ª parcela. Consegue regularizar hoje? Qualquer dúvida, me chama.'
+      ];
     } else if (dias <= 5) {
       urgencia = 'atencao'; infoLabel = 'Vence em ' + dias + ' dia(s)';
-      mensagem = nome + ', sua ' + n + 'ª parcela vence em ' + dias + ' dia(s) (' + formatData(venc) + '). Só passando pra lembrar e já deixar tudo em dia — qualquer coisa me chama!';
+      variantes = [
+        nome + ', sua ' + n + 'ª parcela vence em ' + dias + ' dia(s) (' + data + '). Só passando pra lembrar e já deixar tudo em dia — qualquer coisa me chama!',
+        'Oi ' + nome + ', lembrando que a ' + n + 'ª parcela vence em ' + dias + ' dia(s) (' + data + '). Precisando de ajuda com o pagamento, é só falar.',
+        nome + ', sua ' + n + 'ª parcela está próxima do vencimento (' + data + ', em ' + dias + ' dia(s)). Vamos deixar tudo certinho?'
+      ];
     } else { return null; }
-    return { clienteId: c.id, cliente: c, tipo: 'Parcela ' + n, parcelaN: n, urgencia: urgencia, infoLabel: infoLabel, mensagem: mensagem, prazoTime: venc.getTime() };
+    if (dentroDoCooldown(c, key, urgencia)) return null;
+    var seed = c.id + '|' + key + '|' + urgencia + '|' + dias;
+    return { clienteId: c.id, cliente: c, tipo: 'Parcela ' + n, tipoKey: key, parcelaN: n, urgencia: urgencia, infoLabel: infoLabel, mensagem: variante(variantes, seed), prazoTime: venc.getTime() };
   }
 
   function gerarAcaoSinal(c) {
@@ -688,22 +760,37 @@
     var hoje = todayDate();
     var dias = diffDias(prazo, hoje);
     var nome = primeiroNome(c.nome);
-    var urgencia, mensagem, infoLabel;
+    var data = formatData(prazo);
+    var urgencia, infoLabel, variantes;
 
     if (dias < 0) {
       urgencia = 'atrasado'; infoLabel = 'Prazo do sinal vencido — avalie reduzir a cota ou tirar da produção';
-      mensagem = nome + ', o prazo pra completar o valor do sinal já venceu e o restante ainda não foi pago. Precisamos resolver agora — pode falar comigo?';
+      variantes = [
+        nome + ', o prazo pra completar o valor do sinal já venceu e o restante ainda não foi pago. Precisamos resolver agora — pode falar comigo?',
+        nome + ', o sinal está com o prazo vencido. Vamos conversar hoje pra decidir os próximos passos?'
+      ];
     } else if (dias === 0) {
       urgencia = 'hoje'; infoLabel = 'Último dia pra completar o sinal';
-      mensagem = nome + ', hoje é o último dia pra completar o restante do valor do sinal. Vamos fechar isso agora?';
+      variantes = [
+        nome + ', hoje é o último dia pra completar o restante do valor do sinal. Vamos fechar isso agora?',
+        nome + ', hoje encerra o prazo do sinal. Consigo te ajudar a resolver agora mesmo?'
+      ];
     } else if (dias <= 3) {
       urgencia = 'urgente'; infoLabel = 'Faltam ' + dias + ' dia(s) pra completar o sinal';
-      mensagem = nome + ', faltam ' + dias + ' dia(s) pra completar o restante do sinal antes do fim do mês. Vamos resolver logo?';
+      variantes = [
+        nome + ', faltam ' + dias + ' dia(s) pra completar o restante do sinal antes do fim do mês. Vamos resolver logo?',
+        nome + ', o prazo do sinal está bem próximo (faltam ' + dias + ' dia(s)). Posso te ajudar a fechar isso agora?'
+      ];
     } else {
       urgencia = 'atencao'; infoLabel = 'Faltam ' + dias + ' dias pra completar o sinal (fim do mês)';
-      mensagem = nome + ', só lembrando: o restante do sinal precisa ser completado até o fim do mês (' + formatData(prazo) + ').';
+      variantes = [
+        nome + ', só lembrando: o restante do sinal precisa ser completado até o fim do mês (' + data + ').',
+        'Oi ' + nome + ', o prazo pra completar o sinal é ' + data + '. Vamos garantir isso com tranquilidade?'
+      ];
     }
-    return { clienteId: c.id, cliente: c, tipo: 'Sinal', urgencia: urgencia, infoLabel: infoLabel, mensagem: mensagem, prazoTime: prazo.getTime() };
+    if (dentroDoCooldown(c, 'sinal', urgencia)) return null;
+    var seed = c.id + '|sinal|' + urgencia + '|' + dias;
+    return { clienteId: c.id, cliente: c, tipo: 'Sinal', tipoKey: 'sinal', urgencia: urgencia, infoLabel: infoLabel, mensagem: variante(variantes, seed), prazoTime: prazo.getTime() };
   }
 
   var ORDEM_URGENCIA = { atrasado: 0, hoje: 1, urgente: 2, atencao: 3, leve: 4 };
@@ -964,13 +1051,14 @@
       return '' +
         '<div class="acao-card ' + a.urgencia + '">' +
         '  <div class="acao-head">' +
+        '    <button type="button" class="acao-check" data-action="marcar-contato" data-id="' + a.clienteId + '" data-tipokey="' + a.tipoKey + '" title="Já entrei em contato — some da lista por 3 dias">✓</button>' +
         '    <span class="acao-nome">' + escapeHtml(a.cliente.nome) + '</span>' + vendedorTag +
         '    <span class="badge ' + a.urgencia + '">' + escapeHtml(a.tipo) + '</span>' +
         '    <span class="acao-info">' + escapeHtml(a.infoLabel) + '</span>' +
         '  </div>' +
         '  <textarea class="acao-msg" id="' + idAttr + '">' + escapeHtml(a.mensagem) + '</textarea>' +
         '  <div class="acao-actions">' +
-        (wa ? '<a class="btn whats" target="_blank" rel="noopener" href="' + wa + '" data-action="whats-link" data-msgid="' + idAttr + '" data-tel="' + escapeHtml(a.cliente.telefone || '') + '">Enviar no WhatsApp</a>' : '') +
+        (wa ? '<a class="btn whats" target="_blank" rel="noopener" href="' + wa + '" data-action="whats-link" data-msgid="' + idAttr + '" data-tel="' + escapeHtml(a.cliente.telefone || '') + '" data-id="' + a.clienteId + '" data-tipokey="' + a.tipoKey + '">Enviar no WhatsApp</a>' : '') +
         '    <button class="btn" data-action="copiar" data-msgid="' + idAttr + '">Copiar mensagem</button>' +
         concluirBtn +
         '  </div>' +
@@ -1561,6 +1649,14 @@
     if (btn) abrirModalEditar(btn.dataset.id);
   });
 
+  function registrarContato(clienteId, tipoKey) {
+    if (!clienteId || !tipoKey) return;
+    var patch = {};
+    patch['ultimoContato.' + tipoKey] = todayDate().toISOString().slice(0, 10);
+    db.collection('clientes').doc(clienteId).update(patch)
+      .catch(function (err) { console.error('Não foi possível registrar contato:', err); });
+  }
+
   document.getElementById('acoes-list').addEventListener('click', function (e) {
     var t = e.target;
     var copiarBtn = t.closest('[data-action="copiar"]');
@@ -1577,6 +1673,14 @@
       var taw = document.getElementById(whatsLink.dataset.msgid);
       var novoHref = linkWhatsapp(whatsLink.dataset.tel, taw ? taw.value : '');
       if (novoHref) whatsLink.setAttribute('href', novoHref);
+      registrarContato(whatsLink.dataset.id, whatsLink.dataset.tipokey);
+      return;
+    }
+    var marcarContatoBtn = t.closest('[data-action="marcar-contato"]');
+    if (marcarContatoBtn) {
+      registrarContato(marcarContatoBtn.dataset.id, marcarContatoBtn.dataset.tipokey);
+      marcarContatoBtn.classList.add('feito');
+      marcarContatoBtn.disabled = true;
       return;
     }
     var concluirBtn = t.closest('[data-action="concluir-posvenda"]');
