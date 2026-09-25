@@ -320,7 +320,7 @@
         <button class="btn primary" id="btn-novo">+ Novo cliente</button>
         <button class="btn" id="btn-importar" style="display:none;">Importar planilha</button>
         <button class="btn" id="btn-excluir-tudo" style="display:none;color:var(--vermelho);">Excluir todos os clientes</button>
-        <input class="search" id="busca" placeholder="Buscar cliente...">
+        <input class="search" id="busca" placeholder="Buscar por nome, vendedor, CPF ou telefone...">
       </div>
       <div class="table-wrap">
         <table id="tabela">
@@ -1109,10 +1109,17 @@
   }
 
   function renderTabela(listaBase) {
-    var termo = (document.getElementById('busca').value || '').toLowerCase();
+    var termo = (document.getElementById('busca').value || '').toLowerCase().trim();
+    var termoDigits = termo.replace(/\D/g, '');
     var lista = listaBase.filter(function (c) {
       if (!termo) return true;
-      return (c.nome || '').toLowerCase().indexOf(termo) > -1 || (c.vendedorNome || '').toLowerCase().indexOf(termo) > -1;
+      if ((c.nome || '').toLowerCase().indexOf(termo) > -1) return true;
+      if ((c.vendedorNome || '').toLowerCase().indexOf(termo) > -1) return true;
+      if (termoDigits) {
+        if ((c.cpf || '').replace(/\D/g, '').indexOf(termoDigits) > -1) return true;
+        if ((c.telefone || '').replace(/\D/g, '').indexOf(termoDigits) > -1) return true;
+      }
+      return false;
     }).slice().sort(function (a, b) { return (b.dataVenda || '').localeCompare(a.dataVenda || ''); });
 
     var body = document.getElementById('tabela-body');
